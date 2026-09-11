@@ -1,250 +1,161 @@
 # CNKI Scholar for ChatGPT / Codex
 
-把开源的 [`ExquisiteCore/CNKI-search`](https://github.com/ExquisiteCore/CNKI-search) 改装成一个面向 ChatGPT / Codex 的 **只读 Remote MCP + portable plugin + literature-search skill**。
+**语言：** [English](README.en.md) | [简体中文](README.md)
 
-目标很明确：让模型真正查询 CNKI 文献元数据，而不是把普通网页搜索误当成“查过知网”。这个项目用于文献发现、撞题检查、硕博论文检索、摘要/关键词读取和参考文献追踪；它不下载收费全文、不绕过机构权限，也不破解验证码。
+这是一个让 ChatGPT、Codex 等工具查询 CNKI（中国知网）论文信息的小服务。它可以搜索论文题录、读取摘要和关键词、查看论文详情与参考文献，并返回 JSON 或引用信息。
 
-> **独立性说明：** CNKI Scholar 是一个独立的开源适配项目，不是 CNKI 官方产品，也不代表 CNKI 背书。
+它只读取文献资料，不下载收费全文，不收集 CNKI 账号、密码或 Cookie，也不会尝试绕过验证码和访问限制。
 
-## 现在包含什么
+## 能做什么
 
-```text
-cnki-mcp/
-├── plugin.json                      # 本地/开发 portable plugin manifest
-├── mcp.json                         # 本地 MCP 配置
-├── plugin.template.json             # 生产 URL 模板
-├── mcp.template.json                # 生产 MCP URL 模板
-├── skills/
-│   └── cnki-literature-search/
-│       └── SKILL.md                 # CNKI 文献检索与撞题判断工作流
-├── cnki_chatgpt/
-│   ├── server.py                    # Remote MCP + public policy/domain routes
-│   ├── runner.py                    # 参数校验与 cnki CLI 调用
-│   ├── config.py                    # 环境变量配置
-│   └── policy.py                    # Privacy / Terms / Support 页面
-├── submission/                      # OpenAI 公共发布准备材料
-│   ├── LISTING.md
-│   ├── STARTER_PROMPTS.md
-│   ├── TEST_CASES.md                # 正好 5 个 positive + 3 个 negative
-│   ├── ANNOTATIONS.md
-│   ├── DATA_FLOW.md
-│   ├── AUTH.md
-│   ├── RELEASE_NOTES.md
-│   └── REVIEW_CHECKLIST.md
-├── scripts/configure_plugin.py      # 用真实 HTTPS 域名生成生产插件包
-├── deploy/                          # 反代/部署说明
-├── Dockerfile
-└── docker-compose.yml
+| 工具 | 用途 |
+|---|---|
+| `search_cnki` | 按主题、关键词、篇名、作者、摘要、全文或 DOI 搜索；可以按年份、文献类型和排序方式筛选 |
+| `get_cnki_paper_detail` | 读取标题、作者、单位、摘要、关键词、DOI、来源、基金、被引/下载数等信息 |
+| `get_cnki_references` | 读取一篇论文的参考文献 |
+
+支持的文献类型包括期刊、硕士论文、博士论文、会议、报纸和年鉴。工具名称和参数保持不变，方便接入 MCP 客户端。
+
+## 一键启动（Windows）
+
+先安装并启动 [Docker Desktop](https://www.docker.com/products/docker-desktop/)，然后在项目根目录运行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\start.ps1
 ```
 
-## MCP 工具
+脚本会自动：
 
-| 工具 | 能力 | 安全边界 |
-|---|---|---|
-| `search_cnki` | 主题/关键词/篇名/作者/摘要/全文索引/DOI；年份与文献类型过滤；相关度/时间/被引/下载排序 | 只读；单次结果数有上限 |
-| `get_cnki_paper_detail` | 标题、作者、机构、摘要、关键词、DOI、来源、基金、被引/下载等元数据；可选参考文献 | 只接受 `https://kns.cnki.net/...` |
-| `get_cnki_references` | 获取 CNKI 论文参考文献列表 | 只接受 `https://kns.cnki.net/...` |
+1. 检查 Docker 是否可用；
+2. 构建镜像；
+3. 在后台启动服务；
+4. 等待 `http://127.0.0.1:8000/health` 返回成功。
 
-三个工具都声明：`readOnlyHint=true`、`destructiveHint=false`、`idempotentHint=true`、`openWorldHint=true`。
+启动成功后：
 
-## Skill 做了什么
+- 服务首页：<http://127.0.0.1:8000/>
+- 健康检查：<http://127.0.0.1:8000/health>
+- MCP 地址：<http://127.0.0.1:8000/mcp>
 
-`skills/cnki-literature-search/SKILL.md` 专门解决“这个题到底有没有人写过”这一类问题。它要求模型：
+停止服务：
 
-- 先做**精确篇名检索**，再做主题/关键词扩展；
-- 对创新性判断同时考虑期刊、硕士、博士论文；
-- 分开看“被引最高”和“最新发表”；
-- 结果太少时一次只放宽一个检索维度；
-- 把重合拆成“标题重合 / 对象重合 / 方法重合 / 贡献重合”；
-- **绝不把一次零结果当成“没人研究过”的证明**；
-- 只使用工具实际返回的题名、作者、年份、摘要等元数据，不编造。
-
-例如：
-
-```text
-帮我判断《基于视障人群需求的生活性街道无障碍环境评价与优化》
-这个题目是否已经有人做过。先查精确篇名，再扩大到主题和关键词；
-期刊、硕士和博士都查，不要因为一次零结果就说没人做。
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\start.ps1 -Stop
 ```
 
-## 本地运行
+查看日志：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\start.ps1 -Logs
+```
+
+脚本不会覆盖已有的 `.env`，也不会打印其中的内容。
+
+## 不用脚本时
+
+如果已经安装 Docker，也可以直接运行：
 
 ```bash
-docker compose up --build
-```
-
-然后：
-
-```bash
+docker compose up --build -d
 curl http://127.0.0.1:8000/health
+docker compose down
 ```
 
-默认 MCP endpoint：
+## 在 MCP 客户端中使用
+
+开发配置已经写在根目录的 `mcp.json` 中，默认地址是：
 
 ```text
 http://127.0.0.1:8000/mcp
 ```
 
-开发版根目录的 `mcp.json` 故意指向这个 localhost 地址。
-
-## 生产部署
-
-ChatGPT 公共插件需要一个稳定的公网 HTTPS MCP endpoint。因此生产环境先准备一个域名，比如：
+启动服务后，把这个地址添加到支持 Remote MCP 的客户端，然后可以直接说：
 
 ```text
-https://cnki-scholar.example.com
+帮我在知网上搜索“大语言模型”相关论文，限定 2020 年以后，按被引排序。
 ```
 
-环境变量至少设置：
+也可以要求读取某篇论文的详情或参考文献。详情和参考文献 URL 必须来自 `https://kns.cnki.net/...`。
 
-```env
-PUBLIC_BASE_URL=https://cnki-scholar.example.com
-MCP_ALLOWED_HOSTS=cnki-scholar.example.com,cnki-scholar.example.com:*
-PUBLISHER_NAME=你的 OpenAI 已验证开发者或企业名称
-SUPPORT_EMAIL=你的支持邮箱
-```
+## 直接使用上游 `cnki` 命令
 
-MCP endpoint 会是：
-
-```text
-https://cnki-scholar.example.com/mcp
-```
-
-同时公开：
-
-```text
-/                 项目首页
-/health           健康检查
-/privacy          隐私政策
-/terms            服务条款
-/support          支持说明
-/.well-known/openai-apps-challenge   OpenAI 域名验证
-```
-
-如果提交页面给出域名验证 token：
-
-```env
-OPENAI_APPS_CHALLENGE=粘贴提交页面给你的原始token
-```
-
-服务会原样返回该 token。
-
-反向代理示例见 `deploy/Caddyfile.example`。
-
-## 生成生产 portable plugin 包
-
-不要把示例域名硬写进仓库。部署 HTTPS 后运行：
+Docker 镜像会自动编译并安装上游 [`ExquisiteCore/CNKI-search`](https://github.com/ExquisiteCore/CNKI-search) 的 `cnki` 命令。它也可以单独运行：
 
 ```bash
-python scripts/configure_plugin.py \
-  --base-url https://cnki-scholar.example.com \
-  --publisher "你的已验证发布者名称"
+cnki search "深度学习" --size=10
+cnki search "大语言模型" --from=2020 --to=2025 --sort=cited --size=30
+cnki search "知识图谱" --size=20 --format=citation
+cnki detail "https://kns.cnki.net/kcms2/article/abstract?v=..." --with-refs --format=markdown
+cnki refs "https://kns.cnki.net/kcms2/article/abstract?v=..."
 ```
 
-会生成：
+上游命令支持 JSON、表格、引用和 Markdown 输出。详细参数见 [ExquisiteCore/CNKI-search](https://github.com/ExquisiteCore/CNKI-search)。
 
-```text
-dist-plugin/
-├── plugin.json
-├── mcp.json
-└── skills/cnki-literature-search/SKILL.md
+## 配置
+
+普通本地使用不需要改配置。需要调整时，可以复制示例文件：
+
+```powershell
+Copy-Item .env.example .env
 ```
 
-这里的 `mcp.json` 才会指向真实的公网 HTTPS `/mcp`。
+常用变量：
 
-## OpenAI 公共提交准备
-
-`submission/` 已经把主要材料拆好了：
-
-- 公共 listing 文案；
-- starter prompts；
-- **5 个 positive + 3 个 negative review test cases**；
-- 每个 MCP tool 的 annotation 解释；
-- anonymous read-only 的鉴权设计说明；
-- 数据流/隐私边界；
-- release notes；
-- 一份逐项 review checklist。
-
-正式提交前仍然需要你自己完成几件不可代替的事情：
-
-1. 在 OpenAI Platform 使用真实的、已验证的个人或企业发布者身份；
-2. 有一个真正可访问的 HTTPS 域名；
-3. 提供你自己拥有版权的 logo/icon，不要拿 CNKI 官方 logo 冒充官方集成；
-4. 在提交 portal 里执行 **Scan Tools**；
-5. 真机跑一遍 5+3 review cases；
-6. 按 portal 要求选择发布地区并完成政策声明。
-
-细节见 `submission/REVIEW_CHECKLIST.md`。
-
-## 为什么当前版本不做 OAuth
-
-这是一个**公开文献元数据、只读**的 v0.2.0：没有用户账户，没有用户专属数据库，没有写操作，也不接收 CNKI 账号、校园网密码或机构 cookie。因此它保持 anonymous read-only，而不是为了“看起来更正式”硬塞一个登录系统。
-
-如果未来要做“每个用户绑定自己的机构 CNKI 权限、私有收藏、下载历史”等用户专属功能，再重新设计权限边界，并按当时的 MCP/OpenAI 要求走 OAuth 2.1。
-
-## 数据与隐私
-
-工具请求只把完成当前检索所需的数据发给上游 CNKI：搜索词、筛选参数，或一个 `kns.cnki.net` 论文 URL。
-
-应用代码本身没有保存搜索词/结果的数据库。生产反向代理和云平台仍可能生成常规访问/错误日志，因此部署者应避免记录 request body/原始搜索词，尽量脱敏，并设置有限保留周期。更完整说明见 `/privacy` 和 `submission/DATA_FLOW.md`。
-
-## 安全设计
-
-- 详情/参考文献 URL 必须是 `https://kns.cnki.net/...`，避免 SSRF/任意 URL 抓取；
-- MCP HTTP 层启用 DNS rebinding 防护；
-- 空查询、非法字段/文献类型/排序方式直接拒绝；
-- 年份范围和最大结果数强校验；
-- 默认最大并发 2，避免对 CNKI 激进抓取；
-- 上游 CAPTCHA/反爬触发时明确报错，绝不尝试绕过；
-- 不提供 PDF/CAJ 下载和付费墙绕过；
-- Docker 构建固定 `ExquisiteCore/CNKI-search` revision，避免上游静默变更。
-
-当前固定 revision：
-
-```text
-f7f423c9962c2cfcde8b31086bdb3e1099c46888
-```
-
-## 环境变量
-
-| 变量 | 默认 | 用途 |
+| 变量 | 默认值 | 用途 |
 |---|---|---|
-| `CNKI_BIN` | `/usr/local/bin/cnki` | 上游 CLI |
-| `CNKI_TIMEOUT_SECONDS` | `90` | 单次调用总超时 |
-| `CNKI_MAX_RESULTS` | `100` | 单次最大返回量 |
-| `CNKI_MAX_CONCURRENCY` | `2` | 对 CNKI 最大并发 |
-| `HOST` | `0.0.0.0` | 服务监听地址 |
-| `PORT` | `8000` | 服务端口 |
-| `MCP_ALLOWED_HOSTS` | localhost 集合 | DNS rebinding Host allowlist |
-| `MCP_ALLOWED_ORIGINS` | localhost 集合 | 浏览器/Inspector Origin allowlist |
-| `PUBLIC_BASE_URL` | 空 | 公网 HTTPS origin |
-| `PUBLISHER_NAME` | `CNKI Scholar contributors` | 页面/部署标识 |
-| `SUPPORT_EMAIL` | 空 | 支持/隐私联系邮箱 |
-| `OPENAI_APPS_CHALLENGE` | 空 | OpenAI 域名验证 token |
+| `CNKI_TIMEOUT_SECONDS` | `90` | 单次请求最长等待时间 |
+| `CNKI_MAX_RESULTS` | `100` | 单次最多返回多少条结果 |
+| `CNKI_MAX_CONCURRENCY` | `2` | 同时向 CNKI 发起的请求数 |
+| `PORT` | `8000` | 本地服务端口 |
+| `PUBLISHER_NAME` | `CNKI Scholar contributors` | 页面上显示的维护者名称 |
+| `SUPPORT_EMAIL` | 空 | 支持邮箱 |
+
+`.env` 只应放在本机或服务器上，不要提交到 Git。示例文件不包含真实凭据。
+
+## 公开部署
+
+如果只在自己电脑上使用，到这里就够了。如果要让其他人访问，还需要：
+
+1. 准备一个可以从公网访问的 HTTPS 域名；
+2. 将域名反向代理到容器的 8000 端口；
+3. 设置 `PUBLIC_BASE_URL`、`MCP_ALLOWED_HOSTS`、`PUBLISHER_NAME` 和 `SUPPORT_EMAIL`；
+4. 运行 `python scripts/configure_plugin.py --base-url https://你的域名 --publisher "你的名称"` 生成插件配置。
+
+反向代理示例见 [`deploy/Caddyfile.example`](deploy/Caddyfile.example)。完整的 OpenAI 提交材料在 `submission/` 目录中。
+
+## 安全说明
+
+- 只接受 `https://kns.cnki.net/...` 的论文详情链接；
+- 不提供 PDF/CAJ 下载、付费墙绕过或验证码绕过；
+- 不需要 CNKI 登录账号、校园网密码或机构 Cookie；
+- 服务端不会把搜索结果写入数据库；
+- 公开部署时请关闭详细请求日志，并给日志设置保留期限。
 
 ## 测试
 
-适配层测试无需连接 CNKI：
+适配层测试不需要连接 CNKI：
 
 ```bash
 python -m unittest discover -s tests -v
 ```
 
-另外建议部署后再做两类 live test：
+当前测试集共 11 项。真实的 CNKI 搜索需要能访问 `kns.cnki.net` 的部署环境。
+
+## 项目文件
 
 ```text
-1. 用 MCP Inspector / OpenAI Scan Tools 检查三项工具 schema 和 annotations
-2. 实际跑 search -> detail -> references，确认部署网络可以访问 kns.cnki.net
+cnki-mcp/
+├── cnki_chatgpt/              # MCP 服务代码
+├── skills/                    # 文献检索 skill
+├── scripts/start.ps1          # Windows 一键启动/停止脚本
+├── scripts/configure_plugin.py  # 生成正式插件配置
+├── submission/                # 发布材料
+├── Dockerfile
+├── docker-compose.yml
+├── mcp.json
+└── plugin.json
 ```
 
-本项目不会伪造“联网测试通过”。如果构建环境无法访问 GitHub/CNKI，只能完成静态/适配层测试，真正 CNKI 联调必须在能联网的部署环境完成。
+## 许可证
 
-## License / third-party
-
-本适配层 MIT。上游 `ExquisiteCore/CNKI-search` 也是 MIT；详见 `THIRD_PARTY_NOTICES.md`。CNKI 内容、商标、服务条款与数据库权利归其相应权利人所有。
-
-## License
-
-This project is released under the MIT License. Copyright (c) 2026 Chengxu Xie.
-
-It uses the MIT-licensed open-source project [`ExquisiteCore/CNKI-search`](https://github.com/ExquisiteCore/CNKI-search) as an upstream command-line client. See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for attribution. This repository is an unofficial community project and is not affiliated with, endorsed by, or sponsored by CNKI.
+本项目使用 MIT License，版权归 `Chengxu Xie`（2026）所有。上游 `ExquisiteCore/CNKI-search` 也使用 MIT License，详见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
