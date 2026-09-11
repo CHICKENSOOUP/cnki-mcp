@@ -1,0 +1,6 @@
+cnki-scholar.example.com {
+    encode zstd gzip
+
+    # Keep policy/domain-verification pages and MCP on the same verified host.
+    reverse_proxy 127.0.0.1:8000
+}

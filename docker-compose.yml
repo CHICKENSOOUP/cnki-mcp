@@ -1,0 +1,15 @@
+services:
+  cnki-mcp:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      CNKI_MAX_RESULTS: "${CNKI_MAX_RESULTS:-100}"
+      CNKI_MAX_CONCURRENCY: "${CNKI_MAX_CONCURRENCY:-2}"
+      CNKI_TIMEOUT_SECONDS: "${CNKI_TIMEOUT_SECONDS:-90}"
+      MCP_ALLOWED_HOSTS: "${MCP_ALLOWED_HOSTS:-localhost:*,127.0.0.1:*,[::1]:*}"
+      MCP_ALLOWED_ORIGINS: "${MCP_ALLOWED_ORIGINS:-http://localhost:*,http://127.0.0.1:*,http://[::1]:*}"
+      PUBLIC_BASE_URL: "${PUBLIC_BASE_URL:-}"
+      PUBLISHER_NAME: "${PUBLISHER_NAME:-CNKI Scholar contributors}"
+      SUPPORT_EMAIL: "${SUPPORT_EMAIL:-}"
+      OPENAI_APPS_CHALLENGE: "${OPENAI_APPS_CHALLENGE:-}"

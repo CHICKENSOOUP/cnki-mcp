@@ -1,0 +1,32 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "cnki-scholar",
+  "version": "0.2.0",
+  "description": "Search CNKI literature metadata, inspect paper records, and trace reference lists with a read-only MCP server and research skill.",
+  "author": {
+    "name": "__PUBLISHER_NAME__"
+  },
+  "homepage": "__PUBLIC_BASE_URL__/",
+  "license": "MIT",
+  "keywords": ["CNKI", "academic research", "Chinese literature", "bibliography", "theses"],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "CNKI Scholar",
+        "shortDescription": "Search and inspect CNKI literature metadata.",
+        "longDescription": "Find Chinese academic literature on CNKI, narrow by year and document type, inspect bibliographic metadata, and follow reference lists. Designed for read-only literature discovery and novelty checks.",
+        "developerName": "__PUBLISHER_NAME__",
+        "capabilities": ["Read"],
+        "websiteURL": "__PUBLIC_BASE_URL__/",
+        "privacyPolicyURL": "__PUBLIC_BASE_URL__/privacy",
+        "termsOfServiceURL": "__PUBLIC_BASE_URL__/terms",
+        "defaultPrompt": [
+          "Search CNKI for recent literature on my research topic and group the most relevant journal articles and theses.",
+          "Check whether this proposed research title has already been studied on CNKI, using both exact-title and broader topic searches.",
+          "Find the most cited CNKI papers on this topic, then inspect the strongest matches and their references."
+        ],
+        "brandColor": "#3158A5"
+      }
+    }
+  }
+}

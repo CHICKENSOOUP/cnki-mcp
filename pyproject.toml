@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cnki-chatgpt-mcp"
+version = "0.2.0"
+description = "Read-only Remote MCP and portable plugin package for CNKI literature discovery"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "Chengxu Xie"}]
+dependencies = [
+  "mcp==2.2.0",
+  "pydantic>=2.8,<3",
+]
+
+[project.scripts]
+cnki-chatgpt-mcp = "cnki_chatgpt.server:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["cnki_chatgpt*"]
