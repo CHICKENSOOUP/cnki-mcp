@@ -30,8 +30,6 @@ If a search returns no useful matches, relax one dimension at a time:
 - exact method term → omit the method term;
 - one modern term → common older synonyms.
 
-For visually impaired / accessibility research, useful synonym families may include `视障`, `视觉障碍`, `盲人`, `盲道`, `无障碍`, `友好出行`, `独立出行`, `步行`, `街道`, `社区`, `公共空间`, and context-specific spatial terms. Use only the terms relevant to the user's question.
-
 ## Novelty and overlap checks
 
 Separate four levels of overlap:

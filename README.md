@@ -16,6 +16,18 @@
 
 支持的文献类型包括期刊、硕士论文、博士论文、会议、报纸和年鉴。工具名称和参数保持不变，方便接入 MCP 客户端。
 
+## 两种使用方式
+
+### 方式一：本地 Docker
+
+适合需要完整 CNKI 工具的人。在安装 Docker Desktop 后运行 `scripts/start.ps1`，它会启动本地 MCP 服务。详细步骤见下面的“一键启动”。
+
+### 方式二：只用提示词
+
+适合没有 Docker 或公网服务的人。打开 [`CHATGPT_PROMPT.md`](CHATGPT_PROMPT.md)，把内容复制到自己的 GPT 指令或会话开头，也可以直接上传这个文件。
+
+这种方式让 GPT 学会检索步骤，但不会运行本项目的本地 `cnki` 命令。GPT 能否查到 CNKI 页面，取决于当前会话是否有网页搜索以及 CNKI 页面是否可访问。
+
 ## 一键启动（Windows）
 
 先安装并启动 [Docker Desktop](https://www.docker.com/products/docker-desktop/)，然后在项目根目录运行：
@@ -147,6 +159,7 @@ python -m unittest discover -s tests -v
 cnki-mcp/
 ├── cnki_chatgpt/              # MCP 服务代码
 ├── skills/                    # 文献检索 skill
+├── CHATGPT_PROMPT.md          # 可直接复制到 GPT 的提示词
 ├── scripts/start.ps1          # Windows 一键启动/停止脚本
 ├── scripts/configure_plugin.py  # 生成正式插件配置
 ├── submission/                # 发布材料

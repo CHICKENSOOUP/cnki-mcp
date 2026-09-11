@@ -16,6 +16,18 @@ It only reads literature metadata. It does not download paywalled full text, col
 
 Supported document types include journals, master's theses, doctoral dissertations, conferences, newspapers, and yearbooks. Tool names and arguments stay stable for MCP clients.
 
+## Two ways to use it
+
+### Option 1: Local Docker
+
+Use this when you want the complete CNKI tools. Install Docker Desktop and run `scripts/start.ps1`; it starts the local MCP service. See “One-click start” below.
+
+### Option 2: Prompt only
+
+Use this when you do not have Docker or a public server. Open [`CHATGPT_PROMPT.md`](CHATGPT_PROMPT.md), copy it into your own GPT instructions or the beginning of a chat, or upload the file directly.
+
+This teaches a GPT the search workflow but does not run the local `cnki` command from this repository. Results depend on whether the current chat can use web search and whether CNKI pages are reachable.
+
 ## One-click start (Windows)
 
 Install and start [Docker Desktop](https://www.docker.com/products/docker-desktop/), then run this from the repository root:
@@ -147,6 +159,7 @@ There are currently 11 tests. Real CNKI searches require a deployment that can r
 cnki-mcp/
 ├── cnki_chatgpt/              # MCP service code
 ├── skills/                    # Literature-search skill
+├── CHATGPT_PROMPT.md          # Prompt for direct use in a GPT
 ├── scripts/start.ps1          # Windows one-click start/stop script
 ├── scripts/configure_plugin.py  # Generate production plugin configuration
 ├── submission/                # Release materials
