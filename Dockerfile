@@ -1,6 +1,6 @@
 ARG CNKI_COMMIT=f7f423c9962c2cfcde8b31086bdb3e1099c46888
 
-FROM golang:1.23-bookworm AS cnki-builder
+FROM golang:1.26-bookworm AS cnki-builder
 ARG CNKI_COMMIT
 RUN mkdir -p /out \
  && GOBIN=/out go install github.com/ExquisiteCore/cnki-search/cmd/cnki@${CNKI_COMMIT}
